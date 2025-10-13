@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Transactional;
 import study.querydsl.dto.MemberDto;
 import study.querydsl.dto.QMemberDto;
@@ -717,6 +718,8 @@ public class QuerydslBasicTest {
                 .fetch();
     }
 
+    // 광고 상태 isValid, 날짜가 IN: isServiceAble
+
     private BooleanExpression ageEq(Integer ageCond) {
         return ageCond != null ? member.age.eq(ageCond) : null;
     }
@@ -733,6 +736,90 @@ public class QuerydslBasicTest {
         return usernameEq(usernameCond).and(ageEq(ageCond));
     }
 
+
+    /**
+     * 수정/삭제 벌크 연산
+     */
+    @Test
+    void bulkUpdate() throws Exception {
+
+        //member1 = 10 -> DB member1
+        //member2 = 20 -> DB member2
+        //member3 = 30 -> DB member3
+        //member4 = 40 -> DB member4
+
+        long count = queryFactory
+                .update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(28))
+                .execute();
+
+        // 영속성 컨텍스트 초기화 필요
+        em.flush();
+        em.clear();
+
+        //member1 = 10 -> DB 비회원
+        //member2 = 20 -> DB 비회원
+        //member3 = 30 -> DB member3
+        //member4 = 40 -> DB member4
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .fetch();
+
+        // 영속성 컨텍스트에는 member1, 2, 3, 4 가 출력이 된다
+        // 영속성 컨텍스트가 우선권을 가짐 -> 영속성 컨텍스트 초기화 필요!!
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+
+    }
+
+    @Test
+    void bulkAdd() throws Exception {
+        long count = queryFactory
+                .update(member)
+                .set(member.age, member.age.add(1))
+//                .set(member.age, member.age.multiply(1))
+                .execute();
+
+    }
+
+    @Test
+    void bulkDelete() throws Exception {
+        long count = queryFactory
+                .delete(member)
+                .where(member.age.gt(18))
+                .execute();
+    }
+
+    @Test
+    void sqlFunction() throws Exception {
+        List<String> result = queryFactory
+                .select(Expressions.stringTemplate(
+                        "function('replace', {0}, {1}, {2})", member.username, "member", "M"
+                ))
+                .from(member)
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
+
+    @Test
+    void sqlFunction2() throws Exception {
+        List<String> result = queryFactory
+                .select(member.username)
+                .from(member)
+//                .where(member.username.eq(Expressions.stringTemplate("function('lower', {0})", member.username)))
+                .where(member.username.eq(member.username.lower()))
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
 
 
 }
